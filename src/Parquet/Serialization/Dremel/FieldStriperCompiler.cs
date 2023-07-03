@@ -7,10 +7,13 @@ using System.Reflection;
 using Parquet.Extensions;
 using Parquet.Schema;
 
-namespace Parquet.Serialization.Dremel {
-    class FieldStriperCompiler<TClass> {
-
-        private static readonly MethodInfo LevelsAddMethod = typeof(List<int>).GetMethod(nameof(IList.Add))!;
+namespace Parquet.Serialization.Dremel
+{
+    class FieldStriperCompiler<TClass>
+    {
+        private static readonly MethodInfo LevelsAddMethod = typeof(List<int>).GetMethod(
+            nameof(IList.Add)
+        )!;
         private readonly MethodInfo _valuesListAddMethod;
 
         private readonly ParquetSchema _schema;
@@ -19,13 +22,22 @@ namespace Parquet.Serialization.Dremel {
         private readonly bool _hasDls;
 
         // input parameters
-        private readonly ParameterExpression _dfParam = Expression.Parameter(typeof(DataField), "df");
-        private readonly ParameterExpression _classesParam = Expression.Parameter(typeof(IEnumerable<TClass>), "classes");
+        private readonly ParameterExpression _dfParam = Expression.Parameter(
+            typeof(DataField),
+            "df"
+        );
+        private readonly ParameterExpression _classesParam = Expression.Parameter(
+            typeof(IEnumerable<TClass>),
+            "classes"
+        );
         private static readonly ConstructorInfo ShreddedColumnConstructor =
-            typeof(ShreddedColumn).GetConstructor(BindingFlags.Instance | BindingFlags.Public, null,
+            typeof(ShreddedColumn).GetConstructor(
+                BindingFlags.Instance | BindingFlags.Public,
+                null,
                 CallingConventions.HasThis,
                 new[] { typeof(Array), typeof(List<int>), typeof(List<int>) },
-                null)!;
+                null
+            )!;
 
         // create lists for values, definition levels and repetition levels
         private readonly Type _valuesListType;
@@ -34,12 +46,18 @@ namespace Parquet.Serialization.Dremel {
         private readonly ParameterExpression _rlsVar;
 
         // currently iterated class element
-        private readonly ParameterExpression _classElementVar = Expression.Variable(typeof(TClass), "curr");
+        private readonly ParameterExpression _classElementVar = Expression.Variable(
+            typeof(TClass),
+            "curr"
+        );
 
-        private static readonly Expression NullListOfInt = Expression.Convert(Expression.Constant(null), typeof(List<int>));
+        private static readonly Expression NullListOfInt = Expression.Convert(
+            Expression.Constant(null),
+            typeof(List<int>)
+        );
 
-        public FieldStriperCompiler(ParquetSchema schema, DataField df) {
-
+        public FieldStriperCompiler(ParquetSchema schema, DataField df)
+        {
             _schema = schema;
             _df = df;
             _hasRls = _df.MaxRepetitionLevel > 0;
@@ -52,18 +70,21 @@ namespace Parquet.Serialization.Dremel {
             _rlsVar = Expression.Variable(typeof(List<int>), "rls");
 
             //
-            _valuesListAddMethod = typeof(List<>).MakeGenericType(_df.ClrType).GetMethod(nameof(IList.Add))!;
+            _valuesListAddMethod = typeof(List<>)
+                .MakeGenericType(_df.ClrType)
+                .GetMethod(nameof(IList.Add))!;
         }
 
-        private static void Discover(Field field, out bool isRepeated) {
+        private static void Discover(Field field, out bool isRepeated)
+        {
             isRepeated =
-                field.SchemaType == SchemaType.List ||
-                field.SchemaType == SchemaType.Map ||
-                (field.SchemaType == SchemaType.Data && field is DataField rdf && rdf.IsArray);
+                field.SchemaType == SchemaType.List
+                || field.SchemaType == SchemaType.Map
+                || (field.SchemaType == SchemaType.Data && field is DataField rdf && rdf.IsArray);
         }
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="valueVar"></param>
         /// <param name="dl">Definition level if value is defined. For optional atoms that are null it must be -1.</param>
@@ -71,13 +92,18 @@ namespace Parquet.Serialization.Dremel {
         /// <param name="isLeaf"></param>
         /// <param name="isAtomic">Value is atomic i.e. having real data value and not just RLs and DLs</param>
         /// <returns></returns>
-        private Expression WriteValue(ParameterExpression valueVar,
-            int dl, Expression currentRlVar,
-            ParameterExpression isLeaf, bool isAtomic) {
-
-            if(isAtomic) {
-                if(_df.IsNullable) {
-
+        private Expression WriteValue(
+            ParameterExpression valueVar,
+            int dl,
+            Expression currentRlVar,
+            ParameterExpression isLeaf,
+            bool isAtomic
+        )
+        {
+            if (isAtomic)
+            {
+                if (_df.IsNullable)
+                {
                     Expression getNonNullValue = _df.ClrNullableIfHasNullsType.IsSystemNullable()
                         ? Expression.Property(valueVar, "Value")
                         : valueVar;
@@ -85,101 +111,153 @@ namespace Parquet.Serialization.Dremel {
                     return Expression.IfThenElse(
                         // value == null?
                         Expression.Equal(valueVar, Expression.Constant(null)),
-
                         // only need RL and DL-1
                         Expression.Block(
-                            _hasDls ? Expression.Call(_dlsVar, LevelsAddMethod, Expression.Constant(dl - 1)) : Expression.Empty(),
-                            _hasRls ? Expression.Call(_rlsVar, LevelsAddMethod, currentRlVar) : Expression.Empty()),
-
+                            _hasDls
+                                ? Expression.Call(
+                                    _dlsVar,
+                                    LevelsAddMethod,
+                                    Expression.Constant(dl - 1)
+                                )
+                                : Expression.Empty(),
+                            _hasRls
+                                ? Expression.Call(_rlsVar, LevelsAddMethod, currentRlVar)
+                                : Expression.Empty()
+                        ),
                         // everything, but value must be non-null
                         Expression.Block(
                             Expression.Call(_valuesVar, _valuesListAddMethod, getNonNullValue),
-                            _hasDls ? Expression.Call(_dlsVar, LevelsAddMethod, Expression.Constant(dl)) : Expression.Empty(),
-                            _hasRls ? Expression.Call(_rlsVar, LevelsAddMethod, currentRlVar) : Expression.Empty()));
-
-                } else {
+                            _hasDls
+                                ? Expression.Call(_dlsVar, LevelsAddMethod, Expression.Constant(dl))
+                                : Expression.Empty(),
+                            _hasRls
+                                ? Expression.Call(_rlsVar, LevelsAddMethod, currentRlVar)
+                                : Expression.Empty()
+                        )
+                    );
+                }
+                else
+                {
+                    Expression l = _hasDls
+                        ? Expression.Call(_dlsVar, LevelsAddMethod, Expression.Constant(dl))
+                        : Expression.Empty();
+                    Expression r = _hasRls
+                        ? Expression.Call(_rlsVar, LevelsAddMethod, currentRlVar)
+                        : Expression.Empty();
                     // required atomics are simple - add value, RL and DL as is
                     return Expression.Block(
                         Expression.Call(_valuesVar, _valuesListAddMethod, valueVar),
-                        _hasDls ? Expression.Call(_dlsVar, LevelsAddMethod, Expression.Constant(dl)) : Expression.Empty(),
-                        _hasRls ? Expression.Call(_rlsVar, LevelsAddMethod, currentRlVar) : Expression.Empty());
+                        l,
+                        r
+                    );
                 }
             }
-
 
             // non-atomics still need RL and DL dumped
             return Expression.Block(
                 _hasDls
-                    ? Expression.Call(_dlsVar, LevelsAddMethod,
-                        Expression.Condition(isLeaf, Expression.Constant(dl -1), Expression.Constant(dl)))
+                    ? Expression.Call(
+                        _dlsVar,
+                        LevelsAddMethod,
+                        Expression.Condition(
+                            isLeaf,
+                            Expression.Constant(dl - 1),
+                            Expression.Constant(dl)
+                        )
+                    )
                     : Expression.Empty(),
-                _hasRls ? Expression.Call(_rlsVar, LevelsAddMethod, currentRlVar) : Expression.Empty());
-
+                _hasRls
+                    ? Expression.Call(_rlsVar, LevelsAddMethod, currentRlVar)
+                    : Expression.Empty()
+            );
         }
 
-        private Expression WriteMissingValue(int dl, Expression currentRlVar) {
+        private Expression WriteMissingValue(int dl, Expression currentRlVar)
+        {
             return Expression.Block(
-                _hasDls ? Expression.Call(_dlsVar, LevelsAddMethod, Expression.Constant(dl)) : Expression.Empty(),
-                _hasRls ? Expression.Call(_rlsVar, LevelsAddMethod, currentRlVar) : Expression.Empty());
+                _hasDls
+                    ? Expression.Call(_dlsVar, LevelsAddMethod, Expression.Constant(dl))
+                    : Expression.Empty(),
+                _hasRls
+                    ? Expression.Call(_rlsVar, LevelsAddMethod, currentRlVar)
+                    : Expression.Empty()
+            );
         }
 
-        private Expression WhileBody(Expression element, bool isAtomic, int dl, ParameterExpression currentRlVar,
-            ParameterExpression seenFieldsVar, Field field, int rlDepth, Type elementType, List<string> path) {
-
+        private Expression WhileBody(
+            Expression element,
+            bool isAtomic,
+            int dl,
+            ParameterExpression currentRlVar,
+            ParameterExpression seenFieldsVar,
+            Field field,
+            int rlDepth,
+            Type elementType,
+            List<string> path
+        )
+        {
             // dl is DL of current element in path, not end DataField
 
             string suffix = field.Path.ToString().Replace(".", "_");
-            ParameterExpression chRepetitionLevelVar = Expression.Variable(typeof(int), $"chRepetitionLevel_{suffix}");
+            ParameterExpression chRepetitionLevelVar = Expression.Variable(
+                typeof(int),
+                $"chRepetitionLevel_{suffix}"
+            );
             ParameterExpression valueVar = Expression.Variable(elementType, $"value_{suffix}");
             ParameterExpression isLeafVar = Expression.Variable(typeof(bool), $"isLeaf_{suffix}");
             return Expression.Block(
                 new[] { chRepetitionLevelVar, valueVar, isLeafVar },
-
                 // L8
                 Expression.Assign(chRepetitionLevelVar, currentRlVar),
-
                 // L9-13
                 Expression.IfThenElse(
                     // if seenFields.Contains(field.Path)
                     //Expression.Call(seenFieldsVar, typeof(HashSet<string>).GetMethod("Contains")!, Expression.Constant(field.Path.ToString())),
                     Expression.IsTrue(seenFieldsVar),
-
                     // chRepetitionLevelVar = treeDepth
                     Expression.Assign(chRepetitionLevelVar, Expression.Constant(rlDepth)),
-
                     // seenFields.Add(field.Path)
                     //Expression.Call(seenFieldsVar, typeof(HashSet<string>).GetMethod("Add")!, Expression.Constant(field.Path.ToString()))
                     Expression.Assign(seenFieldsVar, Expression.Constant(true))
-                    ),
-
+                ),
                 // L14-
                 Expression.Assign(valueVar, element),
-
                 isAtomic
                     ? Expression.Assign(isLeafVar, Expression.Constant(true))
-                    : Expression.Assign(isLeafVar, elementType.IsValueType ? Expression.Constant(false) : valueVar.IsNull()),
-
+                    : Expression.Assign(
+                        isLeafVar,
+                        elementType.IsValueType ? Expression.Constant(false) : valueVar.IsNull()
+                    ),
                 Expression.IfThenElse(
                     Expression.IsTrue(isLeafVar),
                     WriteValue(valueVar, dl, chRepetitionLevelVar, isLeafVar, isAtomic),
                     isAtomic
                         ? Expression.Empty()
-                        : DissectRecord(valueVar, field.NaturalChildren, field.GetNaturalChildPath(path), elementType, rlDepth, chRepetitionLevelVar)
+                        : DissectRecord(
+                            valueVar,
+                            field.NaturalChildren,
+                            field.GetNaturalChildPath(path),
+                            elementType,
+                            rlDepth,
+                            chRepetitionLevelVar
+                        )
                 )
-
             );
         }
 
-        private static Type ExtractElementTypeFromEnumerableType(Type t) {
-            if(t.TryExtractDictionaryType(out Type? keyType, out Type? valueType))
+        private static Type ExtractElementTypeFromEnumerableType(Type t)
+        {
+            if (t.TryExtractDictionaryType(out Type? keyType, out Type? valueType))
                 return typeof(KeyValuePair<,>).MakeGenericType(keyType!, valueType!);
 
-            if(t.TryExtractIEnumerableType(out Type? iet))
+            if (t.TryExtractIEnumerableType(out Type? iet))
                 return iet!;
 
-            throw new ArgumentException($"type {t} is not single-element generic enumerable", nameof(t));
+            throw new ArgumentException(
+                $"type {t} is not single-element generic enumerable",
+                nameof(t)
+            );
         }
-
 
         private Expression DissectRecord(
             Expression rootVar,
@@ -187,20 +265,21 @@ namespace Parquet.Serialization.Dremel {
             List<string> path,
             Type rootType,
             int rlDepth,
-            ParameterExpression currentRlVar) {
-
+            ParameterExpression currentRlVar
+        )
+        {
             // walk schema, not class instance
             // this means value must be propagated down the tree, even if it's not present
 
             string currentPathPart = path.First();
             Field? field = levelFields.FirstOrDefault(x => x.Name == currentPathPart);
-            if(field == null)
+            if (field == null)
                 throw new NotSupportedException($"field '{currentPathPart}' not found");
             int dl = field.MaxDefinitionLevel;
 
             FieldStriperCompiler<TClass>.Discover(field, out bool isRepeated);
             bool isAtomic = path.Count == 1;
-            if(isRepeated)
+            if (isRepeated)
                 rlDepth += 1;
 
             // --
@@ -210,63 +289,114 @@ namespace Parquet.Serialization.Dremel {
             string levelPropertyName = field.ClrPropName ?? field.Name;
             Expression levelProperty = Expression.Property(rootVar, levelPropertyName);
             Type levelPropertyType = rootType.GetProperty(levelPropertyName)!.PropertyType;
-            ParameterExpression seenFieldsVar = Expression.Variable(typeof(HashSet<string>), $"seenFieldsVar_{levelPropertyName}");
-            ParameterExpression seenVar = Expression.Variable(typeof(bool), $"seen_{levelPropertyName}");
+            ParameterExpression seenFieldsVar = Expression.Variable(
+                typeof(HashSet<string>),
+                $"seenFieldsVar_{levelPropertyName}"
+            );
+            ParameterExpression seenVar = Expression.Variable(
+                typeof(bool),
+                $"seen_{levelPropertyName}"
+            );
 
             Expression extraBody;
-            if(isRepeated) {
+            if (isRepeated)
+            {
                 Type elementType = ExtractElementTypeFromEnumerableType(levelPropertyType);
                 Expression collection = levelProperty;
                 ParameterExpression element = Expression.Variable(elementType, "element");
-                Expression elementProcessor = WhileBody(element, isAtomic, dl, currentRlVar, seenVar, field, rlDepth, elementType, path);
+                Expression elementProcessor = WhileBody(
+                    element,
+                    isAtomic,
+                    dl,
+                    currentRlVar,
+                    seenVar,
+                    field,
+                    rlDepth,
+                    elementType,
+                    path
+                );
                 extraBody = elementProcessor.Loop(collection, elementType, element);
 
                 // todo: if levelProperty (collection) is null, we need extra iteration with null value (which rep and def level?)
                 // we do this iteration with non-collection condition below, so need to be done for collection as well.
                 extraBody = Expression.IfThenElse(
-                        Expression.Equal(levelProperty, Expression.Constant(null)),
-                        WriteMissingValue(dl - 1, currentRlVar),
-                        extraBody);
-            } else {
+                    Expression.Equal(levelProperty, Expression.Constant(null)),
+                    WriteMissingValue(dl - 1, currentRlVar),
+                    extraBody
+                );
+            }
+            else
+            {
                 Expression element = levelProperty;
-                extraBody = WhileBody(element, isAtomic, dl, currentRlVar, seenVar, field, rlDepth, levelPropertyType, path);
+                extraBody = WhileBody(
+                    element,
+                    isAtomic,
+                    dl,
+                    currentRlVar,
+                    seenVar,
+                    field,
+                    rlDepth,
+                    levelPropertyType,
+                    path
+                );
             }
 
             return Expression.Block(
                 new[] { seenVar },
                 Expression.Assign(seenVar, Expression.Constant(false)),
-                extraBody);
+                extraBody
+            );
         }
 
-        public FieldStriper<TClass> Compile() {
-
+        public FieldStriper<TClass> Compile()
+        {
             ParameterExpression currentRl = Expression.Variable(typeof(int), "currentRl");
 
-            Expression iteration = DissectRecord(_classElementVar, _schema.Fields.ToArray(), _df.Path.ToList(), typeof(TClass), 0, currentRl);
-            Expression iterationLoop = iteration.Loop(_classesParam, typeof(TClass), _classElementVar);
+            Expression iteration = DissectRecord(
+                _classElementVar,
+                _schema.Fields.ToArray(),
+                _df.Path.ToList(),
+                typeof(TClass),
+                0,
+                currentRl
+            );
+            Expression iterationLoop = iteration.Loop(
+                _classesParam,
+                typeof(TClass),
+                _classElementVar
+            );
 
             BlockExpression block = Expression.Block(
                 new[] { _valuesVar, _dlsVar, _rlsVar, _classElementVar, currentRl },
-
                 Expression.Assign(currentRl, Expression.Constant(0)),
-
                 // init 3 building blocks
                 Expression.Block(
                     Expression.Assign(_valuesVar, Expression.New(_valuesListType)),
-                    Expression.Assign(_dlsVar, _hasDls ? Expression.New(typeof(List<int>)) : NullListOfInt),
-                    Expression.Assign(_rlsVar, _hasRls ?  Expression.New(typeof(List<int>)) : NullListOfInt)),
-
-                iterationLoop,
-
-                // result: use triple to construct ShreddedColumn and return (last element in the block)
-                Expression.New(ShreddedColumnConstructor,
-                    Expression.Call(_valuesVar, _valuesListType.GetMethod("ToArray")!),
+                    Expression.Assign(
                         _dlsVar,
-                        _rlsVar)
-                );
+                        _hasDls ? Expression.New(typeof(List<int>)) : NullListOfInt
+                    ),
+                    Expression.Assign(
+                        _rlsVar,
+                        _hasRls ? Expression.New(typeof(List<int>)) : NullListOfInt
+                    )
+                ),
+                iterationLoop,
+                // result: use triple to construct ShreddedColumn and return (last element in the block)
+                Expression.New(
+                    ShreddedColumnConstructor,
+                    Expression.Call(_valuesVar, _valuesListType.GetMethod("ToArray")!),
+                    _dlsVar,
+                    _rlsVar
+                )
+            );
 
             Func<DataField, IEnumerable<TClass>, ShreddedColumn> lambda = Expression
-                .Lambda<Func<DataField, IEnumerable<TClass>, ShreddedColumn>>(block, _dfParam, _classesParam)
+                .Lambda<Func<DataField, IEnumerable<TClass>, ShreddedColumn>>(
+                    block,
+                    _dfParam,
+                    _classesParam
+                )
                 .Compile();
 
             return new FieldStriper<TClass>(_df, lambda, block, iteration);

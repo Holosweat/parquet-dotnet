@@ -1,8 +1,10 @@
-﻿namespace Parquet.Schema {
+﻿namespace Parquet.Schema
+{
     /// <summary>
     /// Type of schema
     /// </summary>
-    public enum SchemaType {
+    public enum SchemaType
+    {
         /// <summary>
         /// Contains actual values i.e. declared by a <see cref="DataField"/>
         /// </summary>
