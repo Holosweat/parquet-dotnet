@@ -111,6 +111,7 @@ namespace Parquet.Serialization
                 || pi.PropertyType == typeof(Holosweat.TickPackedDiffs)
                 || pi.PropertyType == typeof(Holosweat.Vector3PackedDiffs)
                 || pi.PropertyType == typeof(Holosweat.WorkoutScene)
+                || (parentTypes.Contains(typeof(Holosweat.ApplicationEvent.Types.StartWorkout)))
                 || pi.IsSpecialName
                 || pi.Name == "Item"
             )
