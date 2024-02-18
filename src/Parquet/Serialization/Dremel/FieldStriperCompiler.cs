@@ -320,7 +320,9 @@ namespace Parquet.Serialization.Dremel
                 // todo: if levelProperty (collection) is null, we need extra iteration with null value (which rep and def level?)
                 // we do this iteration with non-collection condition below, so need to be done for collection as well.
                 extraBody = Expression.IfThenElse(
-                    Expression.Equal(levelProperty, Expression.Constant(null)),
+                    levelProperty.Type.IsClass
+                        ? Expression.Equal(levelProperty, Expression.Constant(null))
+                        : Expression.Constant(false),
                     WriteMissingValue(dl - 1, currentRlVar),
                     extraBody
                 );
